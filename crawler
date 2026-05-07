@@ -1,0 +1,81 @@
+const { chromium } = require('playwright');
+const sqlite3 = require('sqlite3').verbose();
+const fs = require('fs');
+const path = require('path');
+
+// 確保目錄存在
+if (!fs.existsSync('./data')) fs.mkdirSync('./data');
+
+const db = new sqlite3.Database('./data/jobs.db');
+
+// 初始化資料庫
+db.serialize(() => {
+  db.run(`CREATE TABLE IF NOT EXISTS jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id TEXT UNIQUE,
+    title TEXT,
+    company TEXT,
+    area TEXT,
+    salary TEXT,
+    url TEXT,
+    created_at TEXT
+  )`);
+});
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function crawl() {
+  console.log('🚀 爬蟲開始:', new Date());
+  
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  
+  const keywords = ['軟體工程師', '後端工程師', '前端工程師'];
+  let total = 0;
+  
+  for (const keyword of keywords) {
+    console.log(`🔍 搜尋: ${keyword}`);
+    
+    for (let pageNum = 1; pageNum <= 2; pageNum++) {
+      const url = `https://www.104.com.tw/jobs/search/?keyword=${encodeURIComponent(keyword)}&page=${pageNum}`;
+      
+      try {
+        await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+        await sleep(3000);
+        
+        const jobs = await page.evaluate(() => {
+          const items = [];
+          document.querySelectorAll('[data-gtm="job-item"]').forEach(el => {
+            const title = el.querySelector('.job-title')?.innerText || '';
+            const company = el.querySelector('.company-name')?.innerText || '';
+            const area = el.querySelector('.job-location')?.innerText || '';
+            const salary = el.querySelector('.job-salary')?.innerText || '';
+            const link = el.querySelector('a.job-title')?.href || '';
+            if (title) items.push({ title, company, area, salary, link });
+          });
+          return items;
+        });
+        
+        for (const job of jobs) {
+          const jobId = job.link.match(/job\/(\d+)/)?.[1] || Date.now().toString();
+          db.run(`INSERT OR REPLACE INTO jobs (job_id, title, company, area, salary, url, created_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [jobId, job.title, job.company, job.area, job.salary, job.link, new Date().toISOString()]);
+          total++;
+        }
+        
+        console.log(`   第${pageNum}頁: ${jobs.length} 筆`);
+        await sleep(2000);
+        
+      } catch(e) {
+        console.log(`   錯誤: ${e.message}`);
+      }
+    }
+  }
+  
+  await browser.close();
+  console.log(`✅ 完成! 共 ${total} 筆職缺`);
+  process.exit(0);
+}
+
+crawl();
