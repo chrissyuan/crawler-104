@@ -1,0 +1,28 @@
+name: 104 Crawler
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # 每6小時執行
+  workflow_dispatch:         # 支援手動觸發
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - run: npm install
+      - run: npx playwright install chromium
+      
+      - name: Run crawler
+        run: node crawler.js
+      
+      - name: Upload data
+        uses: actions/upload-artifact@v4
+        with:
+          name: jobs-data
+          path: data/
