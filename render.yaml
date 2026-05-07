@@ -1,0 +1,6 @@
+services:
+  - type: cron-job
+    name: 104-crawler
+    schedule: "0 */6 * * *"
+    buildCommand: npm install && npx playwright install chromium
+    command: node crawler.js
