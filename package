@@ -1,0 +1,11 @@
+{
+  "name": "crawler-104",
+  "version": "1.0.0",
+  "scripts": {
+    "crawl": "node crawler.js"
+  },
+  "dependencies": {
+    "playwright": "^1.40.0",
+    "sqlite3": "^5.1.6"
+  }
+}
